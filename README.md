@@ -8,7 +8,7 @@ Works with both **SLY** and **SLIME**.
 
 In Clojure, `(comment ...)` is a built-in form used as an interactive scratchpad — you keep scratch expressions inside it, evaluate them individually during development, and they're never executed on load. [Calva](https://calva.io/rich-comments/) calls these "Rich Comments" and makes them a first-class workflow.
 
-`cl-comment-eval` brings the same workflow to Common Lisp. You define a `comment` macro that discards its body:
+`cl-comment-eval` brings the same workflow to Common Lisp. [Serapeum](https://github.com/ruricolist/serapeum) ships a `comment` macro out of the box — `serapeum:comment` is recognized automatically. If you're not using Serapeum, add this to your project:
 
 ```lisp
 (defmacro comment (&rest _body) nil)
@@ -22,9 +22,6 @@ Then use it as a scratchpad alongside your code:
   (* 6 7)      ; => 42
   (list 1 2 3) ; => (1 2 3)
 )
-```
-
-[Serapeum](https://github.com/ruricolist/serapeum) ships a `comment` macro out of the box — `serapeum:comment` is recognized automatically. Otherwise, just define your own.
 
 ## Requirements
 
