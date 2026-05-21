@@ -130,3 +130,26 @@ Customize with `M-x customize-face` or in your theme:
   '(cl-comment-eval-result-face
     ((t :foreground "#c792ea" :slant italic))))
 ```
+
+## MELPA
+
+MELPA submission is pending. Once available, installation will be:
+
+```elisp
+(package-install 'cl-comment-eval)
+```
+
+If you want to add it to MELPA yourself in the meantime, the recipe is:
+
+```
+(cl-comment-eval
+ :fetcher github
+ :repo "selcux/cl-comment-eval")
+```
+
+See the [MELPA contributing guide](https://github.com/melpa/melpa/blob/master/CONTRIBUTING.org) for instructions.
+
+## Versioning
+
+Releases are tagged as `vX.Y.Z` on [GitHub](https://github.com/selcux/cl-comment-eval/tags).
+To pin a specific version with straight.el: `:branch "v0.1.0"`.

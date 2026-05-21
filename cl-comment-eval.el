@@ -2,11 +2,11 @@
 
 ;; Copyright (C) 2026
 
-;; Author:
-;; Version: 0.2.0
+;; Author: Selçuk Öztürk <selcukahmed@gmail.com>
+;; Version: 0.1.0
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: lisp, tools
-;; URL:
+;; URL: https://github.com/selcux/cl-comment-eval
 
 ;;; Commentary:
 
@@ -20,6 +20,8 @@
 ;;   M-x cl-comment-eval-clear-overlays  — clear result overlays manually
 
 ;;; Code:
+
+(require 'cl-lib)
 
 ;;;; Customization
 
@@ -67,10 +69,20 @@ backend regardless of connection state."
   "Face for inline evaluation result text."
   :group 'cl-comment-eval)
 
+;;;; Optional-dependency declarations (suppress byte-compile warnings)
+
+(declare-function sly-interactive-eval  "sly"   (string))
+(declare-function sly-eval-async        "sly"   (sexp &optional cont package env))
+(declare-function sly-current-package   "sly"   ())
+(declare-function slime-interactive-eval  "slime" (string))
+(declare-function slime-eval-async        "slime" (sexp &optional cont package))
+(declare-function slime-current-package   "slime" ())
+
 ;;;; Navigation — pure buffer-position functions
 
 (defun cl-comment-eval--comment-regexp ()
-  "Return a regexp matching any configured comment-block symbol, with or without package prefix."
+  "Return a regexp matching any configured comment-block symbol.
+Matches with or without a package prefix (e.g. `serapeum:comment')."
   (concat "(\\(?:[^[:space:]]*:\\)?\\(?:"
           (mapconcat #'regexp-quote cl-comment-eval-comment-symbols "\\|")
           "\\)\\_>"))
@@ -108,7 +120,7 @@ between forms."
             (scan-error nil)))))))
 
 (defun cl-comment-eval--all-child-bounds ()
-  "Return a list of (START . END) for every direct child of the enclosing comment block."
+  "Return a list of (START . END) for every direct child of the comment block."
   (when-let ((comment-pos (cl-comment-eval--enclosing-comment-pos)))
     (save-excursion
       (goto-char comment-pos)
@@ -210,7 +222,7 @@ connected session; falls back to whichever backend is loaded."
       (_ (user-error "cl-comment-eval: no CL backend available (install SLY or SLIME)")))))
 
 (defun cl-comment-eval--eval-one (bounds)
-  "Evaluate the form described by BOUNDS, using overlay or minibuffer as configured."
+  "Evaluate the form at BOUNDS, using overlay or minibuffer as configured."
   (let ((str (buffer-substring-no-properties (car bounds) (cdr bounds))))
     (if cl-comment-eval-show-overlay
         (cl-comment-eval--eval-async str (cdr bounds))
