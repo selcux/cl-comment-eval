@@ -22,6 +22,7 @@ Then use it as a scratchpad alongside your code:
   (* 6 7)      ; => 42
   (list 1 2 3) ; => (1 2 3)
 )
+```
 
 ## Requirements
 
