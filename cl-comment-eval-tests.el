@@ -119,5 +119,27 @@ The string |HERE| in CONTENT marks where point is placed (and is removed)."
                  (cce--extract
                   "(comment\n  (let ((x (+ 1 |HERE|2))) x))"))))
 
+;;;; cl-comment-eval--all-child-bounds
+
+(ert-deftest cce-all-child-bounds/two-children ()
+  (with-cl-buffer "(comment\n  (+ 1 2)\n  |HERE|(- 3 4))"
+    (let ((bounds (cl-comment-eval--all-child-bounds)))
+      (should (= 2 (length bounds)))
+      (should (equal "(+ 1 2)" (buffer-substring-no-properties
+                                (car (nth 0 bounds)) (cdr (nth 0 bounds)))))
+      (should (equal "(- 3 4)" (buffer-substring-no-properties
+                                (car (nth 1 bounds)) (cdr (nth 1 bounds))))))))
+
+(ert-deftest cce-all-child-bounds/not-in-comment ()
+  (with-cl-buffer "(defun foo ()\n  |HERE|(+ 1 2))"
+    (should-not (cl-comment-eval--all-child-bounds))))
+
+(ert-deftest cce-all-child-bounds/single-atom ()
+  (with-cl-buffer "(comment\n  |HERE|42)"
+    (let ((bounds (cl-comment-eval--all-child-bounds)))
+      (should (= 1 (length bounds)))
+      (should (equal "42" (buffer-substring-no-properties
+                           (caar bounds) (cdar bounds)))))))
+
 (provide 'cl-comment-eval-tests)
 ;;; cl-comment-eval-tests.el ends here

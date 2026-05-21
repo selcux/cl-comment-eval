@@ -3,7 +3,7 @@
 ;; Copyright (C) 2026
 
 ;; Author:
-;; Version: 0.1.0
+;; Version: 0.2.0
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: lisp, tools
 ;; URL:
@@ -16,7 +16,8 @@
 ;;
 ;; Usage:
 ;;   M-x cl-comment-eval-mode   (or add to lisp-mode-hook)
-;;   Place point on a form inside (comment ...), press C-c C-e.
+;;   C-c C-j  — eval form at point; if between forms, eval all in block
+;;   M-x cl-comment-eval-clear-overlays  — clear result overlays manually
 
 ;;; Code:
 
@@ -40,6 +41,23 @@ backend regardless of connection state."
   :type '(choice (const :tag "Auto-detect" auto)
                  (const :tag "SLY" sly)
                  (const :tag "SLIME" slime))
+  :group 'cl-comment-eval)
+
+(defcustom cl-comment-eval-show-overlay t
+  "When non-nil, show evaluation results as inline overlays."
+  :type 'boolean
+  :group 'cl-comment-eval)
+
+(defcustom cl-comment-eval-overlay-max-length 80
+  "Maximum character length of an inline result. Longer values are truncated."
+  :type 'integer
+  :group 'cl-comment-eval)
+
+;;;; Face
+
+(defface cl-comment-eval-result-face
+  '((t :inherit shadow))
+  "Face for inline evaluation result overlays."
   :group 'cl-comment-eval)
 
 ;;;; Navigation — pure buffer-position functions
@@ -82,6 +100,60 @@ between forms."
                     (throw 'found (cons start (point))))))
             (scan-error nil)))))))
 
+(defun cl-comment-eval--all-child-bounds ()
+  "Return a list of (START . END) for every direct child of the enclosing comment block."
+  (when-let ((comment-pos (cl-comment-eval--enclosing-comment-pos)))
+    (save-excursion
+      (goto-char comment-pos)
+      (down-list)
+      (forward-sexp)   ; skip `comment' symbol
+      (let (result)
+        (condition-case nil
+            (while t
+              (skip-chars-forward " \t\n\r")
+              (let ((start (point)))
+                (forward-sexp)
+                (push (cons start (point)) result)))
+          (scan-error nil))
+        (nreverse result)))))
+
+;;;; Overlay display
+
+(defvar-local cl-comment-eval--overlays nil
+  "List of active result overlays in this buffer.")
+
+(defun cl-comment-eval--clear-overlay-at (pos)
+  "Remove any existing result overlay at POS."
+  (setq cl-comment-eval--overlays
+        (cl-remove-if (lambda (ov)
+                        (when (= (overlay-start ov) pos)
+                          (delete-overlay ov)
+                          t))
+                      cl-comment-eval--overlays)))
+
+(defun cl-comment-eval--show-overlay (pos value)
+  "Display VALUE as an overlay after POS."
+  (cl-comment-eval--clear-overlay-at pos)
+  (let* ((text (if (> (length value) cl-comment-eval-overlay-max-length)
+                   (concat (substring value 0 cl-comment-eval-overlay-max-length) "…")
+                 value))
+         (ov (make-overlay pos pos)))
+    (overlay-put ov 'after-string
+                 (propertize (concat " => " text)
+                             'face 'cl-comment-eval-result-face))
+    (overlay-put ov 'cl-comment-eval t)
+    (push ov cl-comment-eval--overlays)))
+
+(defun cl-comment-eval-clear-overlays ()
+  "Remove all result overlays from the current buffer."
+  (interactive)
+  (mapc #'delete-overlay cl-comment-eval--overlays)
+  (setq cl-comment-eval--overlays nil))
+
+(defun cl-comment-eval--clear-on-change (&rest _)
+  (when cl-comment-eval--overlays
+    (cl-comment-eval-clear-overlays)))
+
 ;;;; Backend detection and dispatch
 
 (defun cl-comment-eval--active-backend ()
@@ -104,24 +176,56 @@ connected session; falls back to whichever backend is loaded."
    (t nil)))
 
 (defun cl-comment-eval--eval-string (string)
-  "Evaluate STRING via the active CL backend."
+  "Evaluate STRING via the active CL backend (minibuffer result display)."
   (pcase (cl-comment-eval--active-backend)
     ('sly   (sly-interactive-eval string))
     ('slime (slime-interactive-eval string))
     (_      (user-error "cl-comment-eval: no CL backend available (install SLY or SLIME)"))))
 
+(defun cl-comment-eval--eval-async (string end-pos)
+  "Evaluate STRING and show result as overlay after END-POS."
+  (let ((buf (current-buffer))
+        (pos end-pos))
+    (pcase (cl-comment-eval--active-backend)
+      ('sly
+       (sly-eval-async `(slynk:eval-and-grab-output ,string)
+         (lambda (result)
+           (with-current-buffer buf
+             (cl-comment-eval--show-overlay pos (cadr result))))
+         (sly-current-package)))
+      ('slime
+       (slime-eval-async `(swank:eval-and-grab-output ,string)
+         (lambda (result)
+           (with-current-buffer buf
+             (cl-comment-eval--show-overlay pos (cadr result))))
+         (slime-current-package)))
+      (_ (user-error "cl-comment-eval: no CL backend available (install SLY or SLIME)")))))
+
+(defun cl-comment-eval--eval-one (bounds)
+  "Evaluate the form described by BOUNDS, using overlay or minibuffer as configured."
+  (let ((str (buffer-substring-no-properties (car bounds) (cdr bounds))))
+    (if cl-comment-eval-show-overlay
+        (cl-comment-eval--eval-async str (cdr bounds))
+      (cl-comment-eval--eval-string str))))
+
 ;;;; User-facing command and minor mode
 
 ;;;###autoload
 (defun cl-comment-eval ()
-  "Evaluate the direct child sexp of the enclosing (comment ...) block.
-Dispatches to SLY or SLIME depending on which is active."
+  "Evaluate form at point inside a (comment ...) block.
+If point is inside a specific child form, evaluate that form.
+If point is between forms or on the (comment ...) line, evaluate all children."
   (interactive)
   (let ((bounds (cl-comment-eval--form-bounds)))
-    (unless bounds
-      (user-error "Point is not inside a (comment ...) block"))
-    (cl-comment-eval--eval-string
-     (buffer-substring-no-properties (car bounds) (cdr bounds)))))
+    (cond
+     (bounds
+      (cl-comment-eval--eval-one bounds))
+     ((cl-comment-eval--enclosing-comment-pos)
+      (let ((all (cl-comment-eval--all-child-bounds)))
+        (dolist (b all)
+          (cl-comment-eval--eval-one b))))
+     (t
+      (user-error "Point is not inside a (comment ...) block")))))
 
 ;;;###autoload
 (define-minor-mode cl-comment-eval-mode
@@ -130,7 +234,11 @@ Dispatches to SLY or SLIME depending on which is active."
   :lighter " CE"
   :keymap (let ((map (make-sparse-keymap)))
             (define-key map (kbd "C-c C-j") #'cl-comment-eval)
-            map))
+            map)
+  (if cl-comment-eval-mode
+      (add-hook 'before-change-functions #'cl-comment-eval--clear-on-change nil t)
+    (remove-hook 'before-change-functions #'cl-comment-eval--clear-on-change t)
+    (cl-comment-eval-clear-overlays)))
 
 (provide 'cl-comment-eval)
 ;;; cl-comment-eval.el ends here
