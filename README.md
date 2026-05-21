@@ -39,7 +39,7 @@ Add to `packages.el`:
 
 ```elisp
 (package! cl-comment-eval
-  :recipe (:local-repo "/path/to/cl-comment-eval"))
+  :recipe (:host github :repo "selcux/cl-comment-eval"))
 ```
 
 Add to `config.el`:
@@ -55,16 +55,21 @@ Then run `doom sync`.
 
 ```elisp
 (straight-use-package
-  '(cl-comment-eval :local-repo "/path/to/cl-comment-eval"))
+  '(cl-comment-eval :host github :repo "selcux/cl-comment-eval"))
 
 (add-hook 'lisp-mode-hook #'cl-comment-eval-mode)
 ```
 
 ### Manual
 
-Clone or copy `cl-comment-eval.el` somewhere on your `load-path`, then:
+```bash
+git clone https://github.com/selcux/cl-comment-eval
+```
+
+Add the cloned directory to your `load-path`, then:
 
 ```elisp
+(add-to-list 'load-path "/path/to/cl-comment-eval")
 (require 'cl-comment-eval)
 (add-hook 'lisp-mode-hook #'cl-comment-eval-mode)
 ```
