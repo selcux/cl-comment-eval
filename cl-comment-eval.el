@@ -55,9 +55,16 @@ backend regardless of connection state."
 
 ;;;; Face
 
+(defface cl-comment-eval-result-delimiter-face
+  '((t :inherit shadow :weight bold))
+  "Face for the ` => ' separator in result overlays."
+  :group 'cl-comment-eval)
+
 (defface cl-comment-eval-result-face
-  '((t :inherit shadow))
-  "Face for inline evaluation result overlays."
+  '((((background dark))  :foreground "#a8d8a8" :slant italic)
+    (((background light)) :foreground "#2a7a2a" :slant italic)
+    (t                    :inherit shadow       :slant italic))
+  "Face for inline evaluation result text."
   :group 'cl-comment-eval)
 
 ;;;; Navigation — pure buffer-position functions
@@ -139,8 +146,9 @@ between forms."
                  value))
          (ov (make-overlay pos pos)))
     (overlay-put ov 'after-string
-                 (propertize (concat " => " text)
-                             'face 'cl-comment-eval-result-face))
+                 (concat
+                  (propertize " => " 'face 'cl-comment-eval-result-delimiter-face)
+                  (propertize text   'face 'cl-comment-eval-result-face)))
     (overlay-put ov 'cl-comment-eval t)
     (push ov cl-comment-eval--overlays)))
 
