@@ -6,13 +6,15 @@ Works with both **SLY** and **SLIME**.
 
 ## What is this?
 
-In Common Lisp it's common to define a `comment` macro that discards its body:
+In Clojure, `(comment ...)` is a built-in form used as an interactive scratchpad — you keep scratch expressions inside it, evaluate them individually during development, and they're never executed on load. [Calva](https://calva.io/rich-comments/) calls these "Rich Comments" and makes them a first-class workflow.
+
+`cl-comment-eval` brings the same workflow to Common Lisp. You define a `comment` macro that discards its body:
 
 ```lisp
 (defmacro comment (&rest _body) nil)
 ```
 
-This lets you keep scratch expressions alongside your code — a lightweight scratchpad that won't be executed on load. `cl-comment-eval` lets you evaluate those expressions individually, with results shown inline next to each form.
+Then use it as a scratchpad alongside your code:
 
 ```lisp
 (comment
@@ -22,7 +24,7 @@ This lets you keep scratch expressions alongside your code — a lightweight scr
 )
 ```
 
-[Serapeum](https://github.com/ruricolist/serapeum) ships a `comment` macro out of the box — `serapeum:comment` is recognized automatically.
+[Serapeum](https://github.com/ruricolist/serapeum) ships a `comment` macro out of the box — `serapeum:comment` is recognized automatically. Otherwise, just define your own.
 
 ## Requirements
 
